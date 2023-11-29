@@ -101,6 +101,17 @@ class Forecaster:
     def _prepare_data(
         self, history: pd.DataFrame, data_schema: ForecastingSchema
     ) -> pd.DataFrame:
+        """
+        Puts the data into the expected shape by the forecaster.
+        Drops the time column and puts all the target series as columns in the dataframe.
+
+        Args:
+            history (pd.DataFrame): The provided training data.
+            data_schema (ForecastingSchema): The schema of the training data.
+
+        Returns:
+            pd.DataFrame: The processed data.
+        """
         groups_by_ids = history.groupby(data_schema.id_col)
         all_ids = list(groups_by_ids.groups.keys())
         all_series = [
@@ -158,36 +169,6 @@ class Forecaster:
         self._is_trained = True
         self.data_schema = data_schema
 
-    def _fit_on_series(
-        self, history: pd.DataFrame, data_schema: ForecastingSchema, id: int
-    ):
-        """Fit GradientBoosting model to given individual series of data"""
-        model = GradientBoostingRegressor(
-            n_estimators=self.n_estimators,
-            learning_rate=self.leaarning_rate,
-            loss=self.loss,
-            criterion=self.criterion,
-            min_samples_leaf=self.min_samples_leaf,
-            min_samples_split=self.min_samples_split,
-            random_state=self.random_state,
-        )
-        forecaster = ForecasterAutoregMultiSeries(
-            regressor=model, lags=self.lags, steps=data_schema.forecast_length
-        )
-
-        covariates = data_schema.future_covariates
-
-        history.index = pd.RangeIndex(start=0, stop=len(history))
-
-        self.end_index[id] = len(history)
-        exog = None
-        if covariates:
-            exog = history[covariates]
-
-        forecaster.fit(y=history[data_schema.target], exog=exog)
-
-        return forecaster
-
     def predict(
         self, test_data: pd.DataFrame, prediction_col_name: str
     ) -> pd.DataFrame:
@@ -219,30 +200,6 @@ class Forecaster:
         )
 
         return result
-
-    def _predict_on_series(self, key_and_future_df, id):
-        """Make forecast on given individual series of data"""
-        key, future_df = key_and_future_df
-
-        start = self.end_index[id]
-        future_df.index = pd.RangeIndex(start=start, stop=start + len(future_df))
-        exog = None
-        covariates = self.data_schema.future_covariates
-        if covariates:
-            exog = future_df[covariates]
-
-        if self.models.get(key) is not None:
-            forecast = self.models[key].predict(
-                steps=len(future_df),
-                exog=exog,
-            )
-            future_df[self.data_schema.target] = forecast.values
-
-        else:
-            # no model found - key wasnt found in history, so cant forecast for it.
-            future_df = None
-
-        return future_df
 
     def save(self, model_dir_path: str) -> None:
         """Save the Forecaster to disk.
