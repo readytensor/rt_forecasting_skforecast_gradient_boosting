@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from typing import Union, List
 from sklearn.ensemble import GradientBoostingRegressor
-from skforecast.ForecasterAutoregDirect import ForecasterAutoregDirect
+from skforecast.ForecasterAutoregMultiSeries import ForecasterAutoregMultiSeries
 from schema.data_schema import ForecastingSchema
 from sklearn.exceptions import NotFittedError
 
@@ -88,6 +88,44 @@ class Forecaster:
         self.data_schema = data_schema
         self.end_index = {}
 
+        self.base_model = GradientBoostingRegressor(
+            n_estimators=self.n_estimators,
+            learning_rate=self.leaarning_rate,
+            loss=self.loss,
+            criterion=self.criterion,
+            min_samples_leaf=self.min_samples_leaf,
+            min_samples_split=self.min_samples_split,
+            random_state=self.random_state,
+        )
+
+    def _prepare_data(
+        self, history: pd.DataFrame, data_schema: ForecastingSchema
+    ) -> pd.DataFrame:
+        groups_by_ids = history.groupby(data_schema.id_col)
+        all_ids = list(groups_by_ids.groups.keys())
+        all_series = [
+            groups_by_ids.get_group(id_).drop(columns=data_schema.id_col)
+            for id_ in all_ids
+        ]
+
+        self.all_ids = all_ids
+
+        base = all_series[0][[data_schema.time_col, data_schema.target]]
+        base.rename(
+            columns={data_schema.target: f"{all_ids[0]}_{data_schema.target}"},
+            inplace=True,
+        )
+        for id, series in zip(all_ids[1:], all_series[1:]):
+            series = series[[data_schema.time_col, data_schema.target]]
+            series.rename(
+                columns={data_schema.target: f"{id}_{data_schema.target}"}, inplace=True
+            )
+            base = pd.merge(
+                left=base, right=series, on=data_schema.time_col, how="inner"
+            )
+        base.drop(columns=data_schema.time_col, inplace=True)
+        return base
+
     def fit(
         self,
         history: pd.DataFrame,
@@ -103,23 +141,20 @@ class Forecaster:
             data_schema (ForecastingSchema): The schema of the training data.
             history_length (int): The length of the series used for training.
         """
+
         np.random.seed(self.random_state)
-        groups_by_ids = history.groupby(data_schema.id_col)
-        all_ids = list(groups_by_ids.groups.keys())
-        all_series = [
-            groups_by_ids.get_group(id_).drop(columns=data_schema.id_col)
-            for id_ in all_ids
-        ]
 
-        self.models = {}
+        history = self._prepare_data(history=history, data_schema=data_schema)
 
-        for id, series in zip(all_ids, all_series):
-            if history_length:
-                series = series[-history_length:]
-            model = self._fit_on_series(history=series, data_schema=data_schema, id=id)
-            self.models[id] = model
+        if history_length:
+            history = history.iloc[-history_length:]
 
-        self.all_ids = all_ids
+        forecaster = ForecasterAutoregMultiSeries(
+            regressor=self.base_model, lags=self.lags
+        )
+        self.model = forecaster
+        forecaster.fit(series=history)
+
         self._is_trained = True
         self.data_schema = data_schema
 
@@ -136,7 +171,9 @@ class Forecaster:
             min_samples_split=self.min_samples_split,
             random_state=self.random_state,
         )
-        forecaster = ForecasterAutoregDirect(regressor=model, lags=self.lags, steps=data_schema.forecast_length)
+        forecaster = ForecasterAutoregMultiSeries(
+            regressor=model, lags=self.lags, steps=data_schema.forecast_length
+        )
 
         covariates = data_schema.future_covariates
 
@@ -151,39 +188,37 @@ class Forecaster:
 
         return forecaster
 
-    def predict(self, test_data: pd.DataFrame, prediction_col_name: str) -> np.ndarray:
+    def predict(
+        self, test_data: pd.DataFrame, prediction_col_name: str
+    ) -> pd.DataFrame:
         """Make the forecast of given length.
 
         Args:
             test_data (pd.DataFrame): Given test input for forecasting.
             prediction_col_name (str): Name to give to prediction column.
         Returns:
-            numpy.ndarray: The predicted class labels.
+            pd.DataFrame: The predictions dataframe.
         """
         if not self._is_trained:
             raise NotFittedError("Model is not fitted yet.")
+        time_col = test_data[self.data_schema.time_col]
+        id_col = test_data[self.data_schema.id_col]
 
-        groups_by_ids = test_data.groupby(self.data_schema.id_col)
-        all_series = [
-            groups_by_ids.get_group(id_).drop(columns=self.data_schema.id_col)
-            for id_ in self.all_ids
-        ]
-        # forecast one series at a time
-        all_forecasts = []
-        for id_, series_df in zip(self.all_ids, all_series):
-            forecast = self._predict_on_series(
-                key_and_future_df=(id_, series_df), id=id_
-            )
-            forecast.insert(0, self.data_schema.id_col, id_)
-            all_forecasts.append(forecast)
+        predictions = self.model.predict(steps=self.data_schema.forecast_length)
 
-        # concatenate all series' forecasts into a single dataframe
-        all_forecasts = pd.concat(all_forecasts, axis=0, ignore_index=True)
+        flattened_predictions = []
+        for c in predictions.columns:
+            flattened_predictions += predictions[c].values.tolist()
 
-        all_forecasts.rename(
-            columns={self.data_schema.target: prediction_col_name}, inplace=True
+        result = pd.DataFrame(
+            {
+                self.data_schema.id_col: id_col,
+                self.data_schema.time_col: time_col,
+                prediction_col_name: flattened_predictions,
+            }
         )
-        return all_forecasts
+
+        return result
 
     def _predict_on_series(self, key_and_future_df, id):
         """Make forecast on given individual series of data"""
