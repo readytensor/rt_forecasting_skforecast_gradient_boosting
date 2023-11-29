@@ -1,6 +1,7 @@
 {
   "n_estimators": 100,
-  "lags": 20,
+  "lags_forecast_ratio": 4,
+  "lags": null,
   "criterion": "friedman_mse",
   "min_samples_split": 2,
   "min_samples_leaf": 1,

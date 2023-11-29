@@ -35,6 +35,7 @@ class Forecaster:
         min_samples_leaf: int = 1,
         lags: Union[int, List[int]] = 7,
         random_state: int = 0,
+        history_length: int = None,
     ):
         """Construct a new GradientBoosting Forecaster
 
@@ -83,6 +84,7 @@ class Forecaster:
         self.min_samples_leaf = min_samples_leaf
         self.random_state = random_state
         self.lags = lags
+        self.history_length = history_length
         self._is_trained = False
         self.models = {}
         self.data_schema = data_schema
@@ -141,7 +143,6 @@ class Forecaster:
         self,
         history: pd.DataFrame,
         data_schema: ForecastingSchema,
-        history_length: int = None,
     ) -> None:
         """Fit the Forecaster to the training data.
         A separate GradientBoosting model is fit to each series that is contained
@@ -157,8 +158,8 @@ class Forecaster:
 
         history = self._prepare_data(history=history, data_schema=data_schema)
 
-        if history_length:
-            history = history.iloc[-history_length:]
+        if self.history_length:
+            history = history.iloc[-self.history_length :]
 
         forecaster = ForecasterAutoregMultiSeries(
             regressor=self.base_model, lags=self.lags
@@ -244,18 +245,12 @@ def train_predictor_model(
     Returns:
         'Forecaster': The Forecaster model
     """
-    history_length = None
-    history_forecast_ratio = hyperparameters.get("history_forecast_ratio")
-    if history_forecast_ratio:
-        history_length = data_schema.forecast_length * history_forecast_ratio
-    if "history_forecast_ratio" in hyperparameters:
-        hyperparameters.pop("history_forecast_ratio")
 
     model = Forecaster(
         data_schema=data_schema,
         **hyperparameters,
     )
-    model.fit(history=history, data_schema=data_schema, history_length=history_length)
+    model.fit(history=history, data_schema=data_schema)
     return model
 
 

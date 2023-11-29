@@ -195,3 +195,25 @@ def make_serializable(obj: Any) -> Union[int, float, List[Union[int, float]], An
         return obj.tolist()
     else:
         return json.JSONEncoder.default(None, obj)
+
+
+def process_hyperparameters(hyperparameters: dict, forecast_length: int) -> dict:
+    if hyperparameters.get("history_forecast_ratio"):
+        history_forecast_ratio = hyperparameters["history_forecast_ratio"]
+        history_length = forecast_length * history_forecast_ratio
+        hyperparameters["history_length"] = history_length
+        hyperparameters.pop("history_forecast_ratio")
+
+    if hyperparameters.get("lags_forecast_ratio"):
+        lags_forecast_ratio = hyperparameters["lags_forecast_ratio"]
+        lags = lags_forecast_ratio * forecast_length
+        hyperparameters["lags"] = lags
+        hyperparameters.pop("lags_forecast_ratio")
+
+    if "history_forecast_ratio" in hyperparameters:
+        hyperparameters.pop("history_forecast_ratio")
+
+    if "lags_forecast_ratio" in hyperparameters:
+        hyperparameters.pop("lags_forecast_ratio")
+
+    return hyperparameters
