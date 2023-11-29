@@ -13,6 +13,7 @@ from utils import (
     read_csv_in_directory,
     read_json_as_dict,
     set_seeds,
+    process_hyperparameters,
 )
 
 logger = get_logger(task_name="train")
@@ -79,6 +80,9 @@ def run_training(
         # use default hyperparameters to train model
         logger.info("Training forecaster...")
         default_hyperparameters = read_json_as_dict(default_hyperparameters_file_path)
+        default_hyperparameters = process_hyperparameters(
+            default_hyperparameters, forecast_length=data_schema.forecast_length
+        )
         forecaster = train_predictor_model(
             history=validated_data,
             data_schema=data_schema,
