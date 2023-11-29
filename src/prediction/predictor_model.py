@@ -74,6 +74,8 @@ class Forecaster:
                 - int: include lags from 1 to lags (included).
                 - list, 1d numpy ndarray or range: include only lags present in lags, all elements must be int.
 
+            history_length (int): The number of samples in the history to be included in training.
+
             random_state (int): Sets the underlying random seed at model initialization time.
         """
         self.n_estimators = n_estimators
