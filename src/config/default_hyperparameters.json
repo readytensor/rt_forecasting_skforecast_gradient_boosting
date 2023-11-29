@@ -1,0 +1,11 @@
+{
+  "n_estimators": 100,
+  "lags": 20,
+  "criterion": "friedman_mse",
+  "min_samples_split": 2,
+  "min_samples_leaf": 1,
+  "random_state": 0,
+  "learning_rate": 0.1,
+  "loss": "squared_error",
+  "history_forecast_ratio": null
+}
