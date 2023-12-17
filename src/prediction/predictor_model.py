@@ -156,7 +156,7 @@ class Forecaster:
         data_schema: ForecastingSchema,
     ) -> None:
         """Fit the Forecaster to the training data.
-        A separate RandomForest model is fit to each series that is contained
+        A separate Gradient Boosting model is fit to each series that is contained
         in the data.
 
         Args:
@@ -201,7 +201,7 @@ class Forecaster:
         id: int,
         future_covariates: List = None,
     ):
-        """Fit RandomForest model to given individual series of data"""
+        """Fit Gradient Boosting model to given individual series of data"""
         model = GradientBoostingRegressor(
             n_estimators=self.n_estimators,
             loss=self.loss,
