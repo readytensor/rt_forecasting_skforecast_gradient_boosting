@@ -1,7 +1,6 @@
 import argparse
 from config import paths
 from data_models.data_validator import validate_data
-from hyperparameter_tuning.tuner import tune_hyperparameters
 from logger import get_logger, log_error
 from prediction.predictor_model import (
     evaluate_predictor_model,
@@ -13,7 +12,6 @@ from utils import (
     read_csv_in_directory,
     read_json_as_dict,
     set_seeds,
-    process_hyperparameters,
 )
 
 logger = get_logger(task_name="train")
@@ -80,9 +78,7 @@ def run_training(
         # use default hyperparameters to train model
         logger.info("Training forecaster...")
         default_hyperparameters = read_json_as_dict(default_hyperparameters_file_path)
-        default_hyperparameters = process_hyperparameters(
-            default_hyperparameters, forecast_length=data_schema.forecast_length
-        )
+
         forecaster = train_predictor_model(
             history=validated_data,
             data_schema=data_schema,
