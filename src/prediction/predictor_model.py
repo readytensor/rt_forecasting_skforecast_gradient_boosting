@@ -39,6 +39,7 @@ class Forecaster:
         lags: Union[int, List[int]] = 20,
         use_exogenous: bool = True,
         random_state: int = 0,
+        **kwargs,
     ):
         """Construct a new GradientBoosting Forecaster
 
@@ -79,9 +80,9 @@ class Forecaster:
 
 
             min_samples_leaf (Union[int, float]): The minimum number of samples required to be at a leaf node.
-                 A split point at any depth will only be considered if it leaves at least min_samples_leaf training samples in each of the left and right branches. This may have the effect of smoothing the model, especially in regression.
-                 If int, values must be in the range [1, inf).
-                 If float, values must be in the range (0.0, 1.0) and min_samples_leaf will be ceil(min_samples_leaf * n_samples).
+                    A split point at any depth will only be considered if it leaves at least min_samples_leaf training samples in each of the left and right branches. This may have the effect of smoothing the model, especially in regression.
+                    If int, values must be in the range [1, inf).
+                    If float, values must be in the range (0.0, 1.0) and min_samples_leaf will be ceil(min_samples_leaf * n_samples).
 
             lags (Union[int, List[int]]): Lags used as predictors. Index starts at 1, so lag 1 is equal to t-1.
                 - int: include lags from 1 to lags (included).
@@ -91,6 +92,8 @@ class Forecaster:
                 If true, uses covariates in training.
 
             random_state (int): Sets the underlying random seed at model initialization time.
+
+            kwargs (dict): Additional parameters accepted by the sklearn base model.
         """
         self.n_estimators = n_estimators
         self.learning_rate = learning_rate
@@ -128,6 +131,7 @@ class Forecaster:
             min_samples_leaf=self.min_samples_leaf,
             min_samples_split=self.min_samples_split,
             random_state=self.random_state,
+            **kwargs,
         )
 
         transformer_exog = MinMaxScaler() if has_covariates else None
